@@ -1,0 +1,460 @@
+RXM UI Library - User Guide
+
+Version 2.0 | Roblox Luau | A Dynamic Island style UI with custom intros, 156 icons and 120+ fonts
+
+## 1. What is RXM UI?
+
+RXM UI is a UI-only library for Roblox scripts. It gives you a polished interface and a loading screen. It does **not** contain any game features. You write the features (your "engine"), and the library shows them as toggles, sliders, buttons and so on.
+
+The design is inspired by the iPhone Dynamic Island:
+
+1. Pill: a small capsule at the top of the screen. This is the UI when it is closed.
+2. Notification: when something happens, the pill stretches into a small banner, then shrinks back.
+3. Panel: tap the pill and it expands into the full window with tabs.
+
+Everything is animated with springs, glow, neon borders and other effects. Colors, intro, icons and fonts can all be customised.
+
+The mental model
+
+Library -> Window -> Tabs -> Elements -> your Callback (your logic)
+
+- Library: the thing you load. It holds themes, intros, icons and fonts.
+- Window: one UI (pill + panel). You can create more than one.
+- Tab: a page inside the window.
+- Element: a control on a tab (Toggle, Slider, Button...).
+- Callback: a function you provide. It runs when the user changes the element.
+
+Quick start
+
+Step: Write your script
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RXMBEST/RXM-LIB/refs/heads/main/RXM_UI_Library%20(7).lua"))()
+
+local Window = Library:CreateWindow({ Name = "My Hub" })
+local Main   = Window:AddTab("Main")
+
+Main:Section("Features")
+
+Main:Toggle({
+    Name = "Auto Farm",
+    Default = false,
+    Callback = function(on)
+        print("Auto Farm is", on)
+    end,
+})
+
+Main:Slider({
+    Name = "Speed", Min = 0, Max = 100, Default = 25, Suffix = "%",
+    Callback = function(value) print(value) end,
+})
+
+Main:Button({
+    Name = "Say hello",
+    Callback = function()
+        Window:Notify({ Title = "Hello", Content = "It works!", Type = "success" })
+    end,
+})
+
+Window:CreateSettingsTab()   -- optional built-in Settings tab
+
+Step 3: Use it in game
+
+- Wait for the loading screen to finish. A small pill appears at the top of the screen.
+- Tap or click the pill to open the panel.
+- Drag the header to move the panel.
+- The - button minimises the panel back to the pill. The **x** button removes the UI.
+- RightControl hides or shows the whole UI (change it with `ToggleKey`).
+
+ 3. Creating a window
+
+local Window = Library:CreateWindow({
+    Name = "RXM HUB",
+    Icon = "shield",
+    Intro = true,
+    ToggleKey = Enum.KeyCode.RightControl,
+})
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `Name` | string | `"RXM HUB"` | Title shown in the pill and header. |
+| `Icon` | string | none | Icon shown instead of the dot (see Icons). |
+| `Intro` | boolean, string or table | follows `Library:SetIntroEnabled` (true) | `true` plays the loading screen, `false` skips it, a string picks a named intro, a table is a one-off intro config. |
+| `ToggleKey` | KeyCode | `RightControl` | Key that hides or shows the UI. |
+| `Size` | Vector2 | `(450, 360)` | Panel size. On phones it is fitted to the screen automatically. |
+| `Scale` | number | `0.9` | Overall UI scale. |
+| `Accent` | Color3 | monochrome | UI color (same as `Library:SetAccent`). |
+| `Preset` | string | none | Color preset name (see Colors and theme). |
+| `Font` | string or number | `"Silkscreen"` | Font name or Creator Store asset id. |
+| `AutoOpen` | boolean | false | Open the panel right after the intro. |
+| `Welcome` | boolean | true | Set `false` to hide the "loaded" notification. |
+| `Effects` | table | all true | Turn effects on or off: `Border`, `Glow`, `Neon`, `Shimmer`, `Embers`, `Aurora`, `Sounds`. |
+| `BorderSpeed` | number | 70 | Speed of the rotating neon border. |
+| `ConfigFile` | string | `"RXM_UI_Config.json"` | File used by Save Config and Load Config. |
+| `AutoLoad` | boolean | false | Load the config file automatically at start. |
+
+### Window functions
+
+| Function | What it does |
+|---|---|
+| `Window:AddTab(name, icon)` | Adds a tab and returns it. |
+| `Window:CreateSettingsTab(name)` | Adds the built-in Settings tab. |
+| `Window:Notify({...})` | Shows a notification (see section 5). |
+| `Window:Open()`, `Close()`, `Toggle()` | Expand to panel, collapse to pill, or switch. |
+| `Window:SetVisible(bool)` | Show or hide the whole UI. |
+| `Window:SetIcon(name)` | Change the window icon (`nil` removes it). |
+| `Window:SetTitle(text)` | Change the title. |
+| `Window:SetScale(number)` | Change the UI scale (0.6 to 1.4). |
+| `Window:SetToggleKey(key)` | Change the hide/show key. |
+| `Window:SetEffect(name, bool)` | Turn one effect on or off. |
+| `Window:SelectTab(tab, name or index)` | Switch tab from code. |
+| `Window:Destroy()` | Remove this window. |
+
+ 4. Elements
+
+Every element is created from a tab: `Tab:Element({ ... })`. All of them accept `Name`, `Icon` and `Callback`. Most return an object with `Get()` and `Set(value, silent)`. Pass `silent = true` to change a value without running the callback.
+
+If you add `Flag = "name"`, the latest value is also stored in `Library.Flags.name`.
+
+Section, Label and Paragraph
+
+Main:Section("Combat")              -- small heading
+Main:Section("Combat", "sword")     -- heading with an icon
+Main:Label("Some information")      -- muted text line (returns :Set(text))
+Main:Paragraph({ Title = "About", Content = "Long text that wraps automatically." })
+
+Button
+
+Main:Button({
+    Name = "Teleport",
+    Icon = "map-pin",
+    Solid = true,                    -- optional: filled with the accent color
+    Callback = function() print("clicked") end,
+})
+
+Toggle
+
+local t = Main:Toggle({ Name = "ESP", Default = false, Callback = function(on) print(on) end })
+t:Set(true)      -- turn on (runs the callback)
+t:Get()          -- true or false
+t:Toggle()       -- flip it
+
+Slider
+
+Main:Slider({
+    Name = "Walk Speed",
+    Min = 16, Max = 200, Default = 16,
+    Step = 1,              -- rounding step (decimals allowed, e.g. 0.5)
+    Suffix = " studs",     -- text after the number
+    Callback = function(value) print(value) end,
+})
+
+Users can drag the bar or tap the number box and type a value.
+
+Dropdown
+
+local d = Main:Dropdown({
+    Name = "Mode", Options = { "Easy", "Normal", "Hard" }, Default = "Normal",
+    Callback = function(choice) print(choice) end,
+})
+
+Main:Dropdown({                      -- multi select
+    Name = "Targets", Options = { "A", "B", "C" }, Multi = true, Default = { "A" },
+    Callback = function(list) print(table.concat(list, ", ")) end,
+})
+
+d:Refresh({ "New 1", "New 2" })     -- replace the options later
+
+Input
+
+Main:Input({
+    Name = "Player name", Placeholder = "type here",
+    Numeric = false,       -- true = digits only
+    Live = false,          -- true = callback on every keystroke
+    Callback = function(text) print(text) end,
+})
+
+Keybind
+
+Main:Keybind({
+    Name = "Fly key", Default = Enum.KeyCode.F,
+    Callback = function() print("key pressed") end,   -- runs when the key is pressed
+    Changed  = function(newKey) print(newKey) end,    -- runs when the user rebinds
+})
+
+The user taps the key box and presses a new key. Esc cancels and Backspace clears the bind.
+
+ColorPicker
+
+Main:ColorPicker({
+    Name = "ESP color", Default = Color3.fromRGB(255, 80, 80),
+    Callback = function(color) print(color) end,
+})
+
+Foldout
+
+A collapsible group. Build its content inside `Build`:
+
+Main:Foldout({
+    Name = "Advanced", Open = false,
+    Build = function(tab)
+        tab:Toggle({ Name = "Option 1" })
+        tab:Slider({ Name = "Option 2", Min = 1, Max = 10, Default = 5 })
+    end,
+})
+
+### IconPicker and FontPicker
+
+Cards that open a searchable list so the user can pick an icon or a font:
+
+Main:IconPicker({ Name = "Pick icon", Callback = function(iconName) print(iconName) end })
+Main:FontPicker({ Name = "Pick font", Callback = function(fontName) Library:SetFont(fontName) end })
+
+ 5. Notifications
+
+Window:Notify({
+    Title = "Saved",
+    Content = "Your settings were saved.",
+    Type = "success",     -- "info" (default), "success", "warn" or "error"
+    Duration = 3.5,       -- seconds
+    Icon = "star",        -- optional custom icon
+})
+
+
+- When the UI is closed, the notification appears inside the pill (Dynamic Island style).
+- When the panel is open, it appears as a toast in the corner. Tap a toast to dismiss it.
+- `Library:Notify({...})` sends the notification to the most recent window.
+- If one of your callbacks throws an error, the library shows it as a red notification instead of crashing the UI.
+
+ 6. Loading screen (intro)
+
+The on/off switch
+
+local LOADING_SCREEN = true      -- true = show the intro, false = skip it
+
+local Window = Library:CreateWindow({ Name = "My Hub", Intro = LOADING_SCREEN })
+
+
+You can also use `Library:SetIntroEnabled(false)` before `CreateWindow`. If `Intro` is set in `CreateWindow`, it wins over the global switch. Users can skip a running intro by tapping or clicking the screen.
+
+Creating your own intro
+
+Library:AddIntro("MyIntro", {
+    Style    = "Emblem",                       -- Emblem, Minimal, Cinematic or your own style
+    Text     = "MY HUB",
+    Subtitle = "WELCOME BACK",
+    Image    = "rbxassetid://17297011003",     -- id, rbxassetid, https link, or a file in your workspace
+    Sound    = "rbxassetid://86045706626808",
+    Duration = 5,
+    Colors   = { Primary = Color3.fromRGB(255, 60, 80), Secondary = Color3.fromRGB(120, 0, 20) },
+})
+Library:SetIntro("MyIntro")                    -- make it the active intro
+
+
+| Option | Default | Description |
+|---|---|---|
+| `Style` | `"Emblem"` | Look of the intro (see below), or a function for a custom style. |
+| `Text`, `Subtitle` | RXM HUB, WELCOME | Title (typed out letter by letter) and small text under it. |
+| `Image` | none | Picture in the center. Works with decal ids too. |
+| `Icon` | none | An icon (for example `"crown"`) instead of the image or first letter. |
+| `Letter` | first letter of `Text` | Letter shown when there is no image or icon. |
+| `ImageSpin` | true | Rotate the image. |
+| `Sound`, `Volume` | none, 1.5 | Sound played during the intro. |
+| `Duration` | 5 | Seconds until the progress bar reaches 100%. |
+| `Skippable` | true | Tap to skip. |
+| `TypeSpeed` | 0.055 | Seconds per typed letter. |
+| `Particles`, `Shockwaves`, `Glitch` | true | Effects of the Emblem style. |
+| `Statuses` | built-in list | Status texts, for example `{ {0, "Loading"}, {0.5, "Almost"}, {0.9, "Done"} }` (progress from 0 to 1, then text). |
+| `Colors` | follows UI color | `Primary`, `Secondary`, `Pale`, `Background`, `Text`. |
+| `Font` | follows UI font | Font used only in the intro. |
+| `Base` | none | Name of another intro to inherit settings from. |
+
+Built-in styles
+
+- Emblem: fog, light beam, particles, rotating rings, glitch title and progress bar.
+- Minimal: clean logo ring, typed title, thin progress bar.
+- Cinematic: letterbox bars, zooming title with a light sweep, floating dust.
+
+Quick setters
+
+Library:SetIntroText("MY HUB", "WELCOME")
+Library:SetIntroImage("rbxassetid://123456")
+Library:SetIntroSound("rbxassetid://987654", 2)
+Library:SetIntroStyle("Cinematic")
+Library:SetIntroDuration(4)
+Library:SetIntroColor(Color3.fromRGB(80, 170, 255))   -- Library:SetIntroColor(nil) = follow UI color again
+Library:PlayIntro()                                    -- play it right now (preview)
+
+Writing a completely custom style
+
+Library:AddIntroStyle("Flash", function(ctx)
+    local label = ctx.Make("TextLabel", {
+        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+        Text = ctx.Config.Text, TextScaled = true, Font = Enum.Font.GothamBold,
+        TextColor3 = ctx.Colors.Primary,
+    }, ctx.Stage)
+
+    return {
+        -- t = seconds elapsed, dt = frame time, u = progress 0..1, p = smoothed progress
+        Step = function(t, dt, u, p)
+            label.TextTransparency = 1 - p
+        end,
+        OnComplete = function() end,   -- optional: runs when progress reaches 100%
+    }
+end)
+
+Library:AddIntro("FlashIntro", { Style = "Flash", Text = "HELLO", Duration = 3 })
+
+The `ctx` table contains: `Stage` (the full-screen canvas), `Config`, `Colors`, `Viewport`, `Compact` (true on phones), `Make(class, props, parent)`, `Tween(...)`, `OnImage(fn)`, `StatusAt(progress)` and `Icon(parent, size, color)`.
+
+ 7. Colors and theme
+
+Library:SetPreset("Crimson")                       -- ready-made accent color
+Library:SetAccent(Color3.fromRGB(255, 60, 80))     -- any color
+Library:SetTheme({ Background = Color3.fromRGB(8, 8, 20), Card = Color3.fromRGB(20, 20, 36) })
+
+- Presets: `Monochrome` (default), `Crimson`, `Ocean`, `Violet`, `Emerald`, `Sunset`, `Sakura`, `Gold`.
+- Theme keys: `Accent`, `Accent2`, `Background`, `Card`, `CardHover`, `Stroke`, `Track`, `Off`, `Text`, `Muted`, `Input`, `Button`, `Dark`.
+- Colors update live: the whole UI changes the moment you call these functions.
+
+ 8. Icons
+
+The library ships with 156 vector icons. They are drawn in code, so they need no asset ids, they scale cleanly and they take the accent color.
+
+Writing icons manually
+
+local icon = Library.icon
+
+Window:AddTab(icon.sword("Combat"))              -- tab with an icon
+Main:Section(icon.combat("Combat"))              -- section with an icon
+Main:Section(icon:visual("Visual"))              -- a colon works as well
+Main:Toggle(icon.zap({ Name = "Speed", Callback = print }))
+
+There are also plain forms: `Window:AddTab("Combat", "sword")`, `Main:Section("Combat", "sword")`, and the `Icon = "sword"` option on any element.
+
+Where icons can be used
+
+- Tabs, sections, labels and every element (`Icon = "name"`).
+- The window (`CreateWindow({ Icon = "shield" })` or `Window:SetIcon("shield")`).
+- Notifications (`Icon = "bell"`) and the intro (`Icon = "crown"`).
+
+### Finding icon names
+
+print(table.concat(Library:GetIconNames(), ", "))   -- all names
+
+Or add an `IconPicker`, or use the Settings tab, to browse them with a search box. A few examples: `home`, `settings`, `search`, `bell`, `star`, `heart`, `sword`, `shield`, `skull`, `crown`, `gem`, `zap`, `flame`, `eye`, `user`, `users`, `lock`, `key`, `map-pin`, `globe`, `gauge`, `bug`, `code`, `terminal`, `sliders`, `wifi`, `play`, `pause`, `arrow-up`, `chevron-down`, `check`, `x`.
+
+Category aliases
+
+You can write a category name and the library picks a matching icon: `combat` is sword, `main` is home, `visual` and `esp` are eye, `player` is user, `teleport` is map-pin, `farm` is leaf, `misc` is box, `config` is sliders, `fps` and `antilag` are gauge, and many more. Add your own:
+
+Library:AddIconAlias("boss", "skull")
+
+Using your own images as icons
+
+
+Library:AddIcon("logo", "rbxassetid://1234567890")                          -- a single image
+Library:AddIcon("sheet1", { Image = "rbxassetid://111", Offset = Vector2.new(0, 0), Size = Vector2.new(48, 48) })  -- sprite sheet
+Main:Toggle({ Name = "Custom", Icon = "logo" })
+
+You can also pass an asset id directly: `Icon = "rbxassetid://1234567890"`.
+
+ 9. Fonts
+
+The default font is **Silkscreen** (Creator Store asset `12187371840`). The library includes **85 fonts from the Roblox Creator Store** and 37 Roblox built-in fonts (122 in total), including Poppins, Inter, Montserrat, Open Sans, Roboto Slab, Pacifico and many more.
+
+Library:SetFont("Poppins")                 -- by name
+Library:SetFont(12187371840)               -- by asset id
+Library:SetFont("Gotham")                  -- classic Roblox look
+Library:AddFont("My Font", 1234567890)     -- register your own font family id
+print(table.concat(Library:GetFontNames(), ", "))
+
+local Window = Library:CreateWindow({ Name = "My Hub", Font = "Inter" })
+
+- Changing the font updates all existing text instantly, including the intro.
+- Some fonts (for example the Noto Serif and M PLUS families for Asian languages) are large, so they can load slowly on phones.
+- Pixel and display fonts are best for short text. Pick a plain font (Inter, Poppins, Open Sans) for long text.
+
+ 10. The built-in Settings tab
+
+`Window:CreateSettingsTab()` adds a ready-made tab where players can customise your hub:
+
+- Appearance: UI color picker, presets, UI scale, hide/show key.
+- Font and Icons: searchable pickers for the UI font, window icon and intro icon.
+- Effects: switch the neon border, glow, aurora, embers, sounds and more.
+- Intro: loading-screen switch, intro text, subtitle, image, sound, duration, color, style and a Preview Intro button.
+- Config: Save Config and Load Config buttons.
+
+Saving settings
+
+Library:SaveConfig("MyHub.json")        -- writes color, font, intro and window settings
+Library:LoadConfig("MyHub.json")
+
+Library:CreateWindow({ Name = "My Hub", ConfigFile = "MyHub.json", AutoLoad = true })
+
+Saving needs an executor that supports `writefile`, `readfile` and `isfile`. Without them, everything else still works.
+
+ 11. Where does my script logic go?
+
+The library only draws the interface. Put your features in **callbacks**, and keep their state in normal Lua variables:
+
+local RunService = game:GetService("RunService")
+local farming, speed = false, 25
+
+Main:Toggle({
+    Name = "Auto Farm",
+    Callback = function(on)
+        farming = on
+        if on then
+            task.spawn(function()
+                while farming do
+                    -- your farming logic here
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end,
+})
+
+Main:Slider({ Name = "Speed", Min = 0, Max = 100, Default = speed, Callback = function(v) speed = v end })
+
+local conn
+Main:Toggle({
+    Name = "Anti Lag",
+    Callback = function(on)
+        if on then
+            conn = RunService.Heartbeat:Connect(function()
+                -- your code here
+            end)
+        elseif conn then
+            conn:Disconnect()
+            conn = nil
+        end
+    end,
+})
+
+Tips:
+
+- Toggle is for a feature that stays on or off. **Button** is for a one-time action.
+- Slider, Dropdown and Input** send their value to the callback: store it in a variable and read it in your engine.
+- Long engines can live in their own raw file: call `loadstring(game:HttpGet("ENGINE_LINK"))()` from a callback.
+
+ 12. API cheat sheet
+
+| Area | Functions |
+|---|---|
+| Window | `CreateWindow`, `GetWindow`, `Unload`, `Notify` |
+| Intro | `AddIntro`, `SetIntro`, `AddIntroStyle`, `PlayIntro`, `SetIntroEnabled`, `SetIntroText`, `SetIntroImage`, `SetIntroSound`, `SetIntroStyle`, `SetIntroDuration`, `SetIntroColor`, `GetIntroConfig` |
+| Theme | `SetAccent` (also `SetUIColor`), `SetPreset`, `SetTheme`, `GetAccent`, `OnThemeChanged`, `Presets` |
+| Icons | `icon.name(...)`, `CreateIcon`, `AddIcon`, `AddIconAlias`, `GetIconNames`, `GetIconAliases`, `HasIcon` |
+| Fonts | `SetFont`, `GetFont`, `AddFont`, `GetFontNames`, `GetFontInfo`, `Fonts` |
+| Config | `SaveConfig`, `LoadConfig`, `Flags` |
+
+ 13. Troubleshooting
+
+- Nothing appears: check that the raw link opens in a browser and returns plain Lua text. Run the script again; loading it twice automatically replaces the old UI.
+- ntro image does not show: the id may be a decal or a private asset. Try a different id, an `rbxthumb://` link, or a PNG link starting with `https://` (needs `writefile` and `getcustomasset`). A letter is shown until the image loads.
+- No sound: the sound id must be a public audio asset.
+- Text looks different: you changed the font. Use `Library:SetFont("Gotham")` to return to the classic look.
+- A callback fails: the library shows the error message as a red notification. Fix the code inside the callback.
+- Phone layout: the panel resizes automatically. If it is still too big, lower `Scale` (for example `0.8`).
+- Remove the UI completely: call `Library:Unload()`.
