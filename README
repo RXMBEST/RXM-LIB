@@ -2,7 +2,7 @@ RXM UI Library - User Guide
 
 Version 2.0 | Roblox Luau | A Dynamic Island style UI with custom intros, 156 icons and 120+ fonts
 
-## 1. What is RXM UI?
+1. What is RXM UI?
 
 RXM UI is a UI-only library for Roblox scripts. It gives you a polished interface and a loading screen. It does **not** contain any game features. You write the features (your "engine"), and the library shows them as toggles, sliders, buttons and so on.
 
