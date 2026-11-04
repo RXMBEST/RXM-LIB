@@ -26,6 +26,7 @@ local requestFunc = (syn and syn.request) or (http and http.request) or http_req
 local genv = (getgenv and getgenv()) or _G
 local Library = {
 	Version = "2.0.0",
+	Transparency = 0.2,
 	Flags = {},
 	Windows = {},
 	Intros = {},
@@ -295,6 +296,15 @@ function Library:GetAccent()
 end
 function Library:OnThemeChanged(fn)
 	table.insert(themeListeners, fn)
+end
+
+function Library:SetTransparency(value)
+	value = tonumber(value)
+	if not value then
+		return
+	end
+	self.Transparency = math.clamp(value, 0, 0.9)
+	applyTheme()
 end
 local CLICK_IDS = {
 	"rbxasset://sounds/button.mp3",
@@ -2494,8 +2504,13 @@ function Window:_fire(callback, ...)
 end
 function Window:_build(opts)
 	local W = self
-	local IDLE_W, IDLE_H = 142, 36
-	local NOTIFY_W, NOTIFY_H = 300, 64
+	local IDLE_H = 36
+	local idleW = math.clamp(tonumber(W.IslandWidth) or 142, 90, 420)
+	W.IslandWidth = idleW
+	local NOTIFY_H = 64
+	local function notifyWidth()
+		return math.max(300, idleW + 40)
+	end
 	local PAD_Y = 8
 	local PANEL_R = 30
 	local HEADER_H, TABBAR_H = 46, 34
@@ -2531,7 +2546,7 @@ function Window:_build(opts)
 		swap = {w = {225, 0.70}, h = {245, 0.74}, r = {260, 0.80}},
 	}
 	local sp = {
-		w = newSpring(IDLE_W, 190, 0.7),
+		w = newSpring(idleW, 190, 0.7),
 		h = newSpring(IDLE_H, 210, 0.7),
 		r = newSpring(IDLE_H / 2, 220, 0.7),
 		ox = newSpring(0, 150, 0.85),
@@ -2554,13 +2569,23 @@ function Window:_build(opts)
 		ZIndex = 5,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, PAD_Y),
-		Size = UDim2.fromOffset(IDLE_W, IDLE_H),
+		Size = UDim2.fromOffset(idleW, IDLE_H),
 		BackgroundTransparency = 1,
 		Visible = false,
 		Parent = gui,
 	})
 	local shellScale = new("UIScale", {Scale = 0.001, Parent = shell})
 	W._shell, W._shellScale = shell, shellScale
+	local backdrop = new("TextButton", {
+		Name = "Backdrop",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		ZIndex = 1,
+		Visible = false,
+		Parent = gui,
+	})
 	local halos = {}
 	do
 		local count, spread, total = 10, 54, 0.30
@@ -2601,6 +2626,7 @@ function Window:_build(opts)
 	local islandCorner = corner(island, IDLE_H / 2)
 	bindTheme(island, function(T, f)
 		f.BackgroundColor3 = T.Background
+		f.BackgroundTransparency = math.clamp(Library.Transparency, 0, 0.85)
 	end)
 	local sheen = new("Frame", {
 		Name = "Sheen",
@@ -2673,8 +2699,8 @@ function Window:_build(opts)
 			apply()
 		end
 	end
-	local idleG = makeGroup("Idle", IDLE_W, IDLE_H)
-	local notifyG = makeGroup("Notify", NOTIFY_W, NOTIFY_H)
+	local idleG = makeGroup("Idle", idleW, IDLE_H)
+	local notifyG = makeGroup("Notify", notifyWidth(), NOTIFY_H)
 	local panelG = makeGroup("Panel", PW, PH)
 	corner(panelG.frame, PANEL_R)
 	local panel = panelG.frame
@@ -2875,7 +2901,7 @@ function Window:_build(opts)
 	round(logoDot)
 	local title = new("TextLabel", {
 		Position = UDim2.new(0, 48, 0, 0),
-		Size = UDim2.new(1, -120, 1, 0),
+		Size = UDim2.new(1, -64, 1, 0),
 		BackgroundTransparency = 1,
 		Text = W.Name,
 		Font = Enum.Font.GothamBold,
@@ -2893,72 +2919,6 @@ function Window:_build(opts)
 		local base = lighten(T.Accent, 0.55)
 		titleGrad.Color = ColorSequence.new({ck(0, base), ck(0.5, WHITE), ck(1, base)})
 	end)
-	local function headerButton(xOff, kind)
-		local b = new("TextButton", {
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, xOff, 0.5, 0),
-			Size = UDim2.fromOffset(26, 26),
-			BackgroundColor3 = Theme.Button,
-			BackgroundTransparency = 0.25,
-			Text = "",
-			AutoButtonColor = false,
-			ZIndex = 6,
-			Parent = header,
-		})
-		round(b)
-		local st = stroke(b, Theme.Stroke, 1, 0.3)
-		local bars = {}
-		local function bar(w, h, rot)
-			local f = new("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(w, h),
-				Rotation = rot,
-				BackgroundColor3 = Theme.Muted,
-				BorderSizePixel = 0,
-				ZIndex = 7,
-				Parent = b,
-			})
-			round(f)
-			table.insert(bars, f)
-		end
-		if kind == "min" then
-			bar(10, 2, 0)
-		else
-			bar(12, 2, 45)
-			bar(12, 2, -45)
-		end
-		local scale = new("UIScale", {Scale = 1, Parent = b})
-		b.MouseEnter:Connect(function()
-			local color = kind == "close" and kindColor("error") or Theme.Accent
-			tween(b, 0.2, {BackgroundColor3 = color, BackgroundTransparency = 0.78}, ES.Quad)
-			tween(st, 0.2, {Color = color, Transparency = 0.2}, ES.Quad)
-			for _, f in ipairs(bars) do
-				tween(f, 0.2, {BackgroundColor3 = WHITE}, ES.Quad)
-			end
-		end)
-		b.MouseLeave:Connect(function()
-			tween(b, 0.3, {BackgroundColor3 = Theme.Button, BackgroundTransparency = 0.25}, ES.Quad)
-			tween(st, 0.3, {Color = Theme.Stroke, Transparency = 0.3}, ES.Quad)
-			for _, f in ipairs(bars) do
-				tween(f, 0.3, {BackgroundColor3 = Theme.Muted}, ES.Quad)
-			end
-			tween(scale, 0.3, {Scale = 1}, ES.Back)
-		end)
-		b.InputBegan:Connect(function(input)
-			if isPress(input) then
-				tween(scale, 0.09, {Scale = 0.85}, ES.Quad)
-			end
-		end)
-		b.InputEnded:Connect(function(input)
-			if isPress(input) then
-				tween(scale, 0.4, {Scale = 1}, ES.Back)
-			end
-		end)
-		return b
-	end
-	local btnClose = headerButton(-12, "close")
-	local btnMin = headerButton(-44, "min")
 	local headerIcon = createIcon(W.Icon or "circle", header, 18, "Accent", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0, 28, 0.5, 0),
@@ -3000,6 +2960,9 @@ function Window:_build(opts)
 	})
 	round(tabBar)
 	local tabBarStroke = stroke(tabBar, Theme.Stroke, 1, 0.3)
+	bindTheme(tabBar, function()
+		tabBar.BackgroundTransparency = math.clamp(0.1 + Library.Transparency * 0.6, 0, 0.9)
+	end)
 	local highlight = new("Frame", {
 		BackgroundColor3 = Theme.Accent,
 		BackgroundTransparency = 0.78,
@@ -3055,9 +3018,10 @@ function Window:_build(opts)
 		ZIndex = 8,
 		Parent = pageHost,
 	})
-	new("UIGradient", {Rotation = 90, Transparency = NumberSequence.new({kp(0, 1), kp(1, 0)}), Parent = fadeBottom})
+	local fadeGrad = new("UIGradient", {Rotation = 90, Transparency = NumberSequence.new({kp(0, 1), kp(1, 0)}), Parent = fadeBottom})
 	bindTheme(fadeBottom, function(T, f)
 		f.BackgroundColor3 = T.Background
+		fadeGrad.Transparency = NumberSequence.new({kp(0, 1), kp(1, math.clamp(Library.Transparency, 0, 0.85))})
 	end)
 	W._tabBar, W._pageHost = tabBar, pageHost
 	local chromeRest = {header = header.Position, tabs = tabBar.Position, pages = pageHost.Position}
@@ -3166,15 +3130,19 @@ function Window:_build(opts)
 			sp.w.t, sp.h.t, sp.r.t = PW, PH, PANEL_R
 			sp.ox.t, sp.oy.t = panelPos.x, panelPos.y
 		elseif state == "notify" then
-			sp.w.t, sp.h.t, sp.r.t = NOTIFY_W, NOTIFY_H, NOTIFY_H / 2
+			sp.w.t, sp.h.t, sp.r.t = notifyWidth(), NOTIFY_H, NOTIFY_H / 2
 			sp.ox.t, sp.oy.t = 0, 0
 		else
-			sp.w.t = IDLE_W + (hover and 10 or 0)
+			sp.w.t = idleW + (hover and 10 or 0)
 			sp.h.t = IDLE_H + (hover and 2 or 0)
 			sp.r.t = sp.h.t / 2
 			sp.ox.t, sp.oy.t = 0, 0
 		end
 	end
+	local function updateBackdrop()
+		backdrop.Visible = state == "expanded" and visible
+	end
+
 	local function setState(newState)
 		if not W.Alive or newState == state then
 			return
@@ -3182,6 +3150,7 @@ function Window:_build(opts)
 		local old = state
 		state = newState
 		W.State = newState
+		updateBackdrop()
 		glowKick = 1
 		if newState == "expanded" then
 			applyProfile(PROFILES.open)
@@ -3225,6 +3194,7 @@ function Window:_build(opts)
 	end
 	function W:SetVisible(on)
 		visible = on and true or false
+		updateBackdrop()
 		sp.show.t = visible and 1 or 0
 		if visible then
 			applyProfile(PROFILES.pop)
@@ -3232,6 +3202,23 @@ function Window:_build(opts)
 	end
 	function W:IsOpen()
 		return state == "expanded"
+	end
+	function W:SetIslandWidth(width)
+		width = tonumber(width)
+		if not width then
+			return
+		end
+		idleW = math.clamp(width, 90, 420)
+		W.IslandWidth = idleW
+		idleG.frame.Size = UDim2.fromOffset(idleW, IDLE_H)
+		notifyG.frame.Size = UDim2.fromOffset(notifyWidth(), NOTIFY_H)
+		if state ~= "expanded" then
+			applyProfile(PROFILES.swap)
+		end
+		applyTargets()
+	end
+	function W:GetIslandWidth()
+		return idleW
 	end
 	function W:SetScale(scale)
 		self.Scale = math.clamp(scale, 0.6, 1.4)
@@ -3276,13 +3263,11 @@ function Window:_build(opts)
 		W.Click(1, 0.9)
 		setState("expanded")
 	end)
-	btnMin.MouseButton1Click:Connect(function()
-		W.Click(0.95, 0.8)
-		setState("idle")
-	end)
-	btnClose.MouseButton1Click:Connect(function()
-		W.Click(0.9, 0.9)
-		W:Destroy()
+	backdrop.MouseButton1Click:Connect(function()
+		if state == "expanded" then
+			W.Click(0.95, 0.8)
+			setState("idle")
+		end
 	end)
 	local dragging, dragStart, dragOrigin = false, nil, nil
 	header.InputBegan:Connect(function(input)
@@ -3454,6 +3439,7 @@ function Window:_build(opts)
 			Position = UDim2.new(1, TW + 40, 0, 0),
 			Size = UDim2.fromOffset(TW, TH),
 			BackgroundColor3 = Theme.Background,
+			BackgroundTransparency = math.clamp(Library.Transparency, 0, 0.6),
 			BorderSizePixel = 0,
 			GroupTransparency = 1,
 			Parent = slot,
@@ -3859,7 +3845,9 @@ function Tab:_card(height, name, o)
 	c.hoverColor = function()
 		return Theme.CardHover
 	end
+	c.alphaBase, c.alphaFactor = 0.12, 0.7
 	bindTheme(card, function(T)
+		card.BackgroundTransparency = math.clamp(c.alphaBase + Library.Transparency * c.alphaFactor, 0, 0.95)
 		card.BackgroundColor3 = c.hovering and c.hoverColor() or c.restColor()
 		st.Color = c.hovering and T.Accent or T.Stroke
 	end)
@@ -4131,7 +4119,8 @@ function Tab:Button(o)
 		c.hoverColor = function()
 			return lighten(Theme.Accent, 0.2)
 		end
-		c.card.BackgroundTransparency = 0.05
+		c.alphaBase, c.alphaFactor = 0.05, 0.15
+		c.card.BackgroundTransparency = math.clamp(c.alphaBase + Library.Transparency * c.alphaFactor, 0, 0.95)
 	end
 	bindTheme(arrow, function(T)
 		if o.Solid then
@@ -5460,6 +5449,9 @@ local function applyWindowConfig(W, wc)
 	if type(wc.Icon) == "string" and wc.Icon ~= "" then
 		W:SetIcon(wc.Icon)
 	end
+	if type(wc.IslandWidth) == "number" then
+		W:SetIslandWidth(wc.IslandWidth)
+	end
 	if type(wc.BorderSpeed) == "number" then
 		W.BorderSpeed = wc.BorderSpeed
 	end
@@ -5488,6 +5480,7 @@ function Library:SaveConfig(fileName)
 	end
 	local data = {
 		Font = self.FontName,
+		Transparency = self.Transparency,
 		Accent = c3ToTable(Theme.Accent),
 		Intro = {
 			Style = type(raw.Style) == "string" and raw.Style or nil,
@@ -5504,7 +5497,7 @@ function Library:SaveConfig(fileName)
 	}
 	local W = self.Windows[1]
 	if W then
-		data.Window = {FX = W.FX, Scale = W.Scale, BorderSpeed = W.BorderSpeed, ToggleKey = W.ToggleKey.Name, Icon = W.Icon}
+		data.Window = {FX = W.FX, Scale = W.Scale, BorderSpeed = W.BorderSpeed, ToggleKey = W.ToggleKey.Name, Icon = W.Icon, IslandWidth = W.IslandWidth}
 	end
 	local okJson, json = pcall(function()
 		return HttpService:JSONEncode(data)
@@ -5539,6 +5532,9 @@ function Library:LoadConfig(fileName)
 	end
 	if type(data.Font) == "string" then
 		self:SetFont(data.Font)
+	end
+	if type(data.Transparency) == "number" then
+		self:SetTransparency(data.Transparency)
 	end
 	local accent = tableToC3(data.Accent)
 	if accent then
@@ -5583,6 +5579,9 @@ function Library:CreateWindow(opts)
 	if opts.Font ~= nil then
 		self:SetFont(opts.Font)
 	end
+	if type(opts.Transparency) == "number" then
+		self:SetTransparency(opts.Transparency)
+	end
 	if opts.Preset then
 		self:SetPreset(opts.Preset)
 	end
@@ -5600,6 +5599,7 @@ function Library:CreateWindow(opts)
 	W._pending = {}
 	W.ConfigFile = configFile
 	W.Icon = opts.Icon
+	W.IslandWidth = opts.IslandWidth
 	W.ToggleKey = opts.ToggleKey or Enum.KeyCode.RightControl
 	W.Scale = opts.Scale or 0.9
 	W.BorderSpeed = opts.BorderSpeed or 70
@@ -5618,6 +5618,9 @@ function Library:CreateWindow(opts)
 		end
 		if opts.Icon == nil and type(wc.Icon) == "string" and wc.Icon ~= "" then
 			W.Icon = wc.Icon
+		end
+		if opts.IslandWidth == nil and type(wc.IslandWidth) == "number" then
+			W.IslandWidth = wc.IslandWidth
 		end
 		if opts.BorderSpeed == nil and type(wc.BorderSpeed) == "number" then
 			W.BorderSpeed = wc.BorderSpeed
@@ -5733,6 +5736,27 @@ function Window:CreateSettingsTab(name)
 		Default = W.Scale,
 		Callback = function(value)
 			W:SetScale(value)
+		end,
+	})
+	tab:Slider({
+		Name = "UI Transparency",
+		Min = 0,
+		Max = 0.8,
+		Step = 0.05,
+		Default = Library.Transparency,
+		Callback = function(value)
+			Library:SetTransparency(value)
+		end,
+	})
+	tab:Slider({
+		Name = "Island Width",
+		Min = 90,
+		Max = 420,
+		Step = 2,
+		Suffix = " px",
+		Default = W:GetIslandWidth(),
+		Callback = function(value)
+			W:SetIslandWidth(value)
 		end,
 	})
 	tab:Keybind({
@@ -5923,6 +5947,27 @@ function Window:CreateSettingsTab(name)
 				Content = ok and W.ConfigFile or tostring(err),
 				Type = ok and "success" or "error",
 			})
+		end,
+	})
+
+	tab:Section("UI", "trash")
+	local confirmAt = -10
+	local destroyBtn
+	destroyBtn = tab:Button({
+		Name = "Destroy UI",
+		Icon = "trash",
+		Callback = function()
+			if os.clock() - confirmAt < 3 then
+				W:Destroy()
+			else
+				confirmAt = os.clock()
+				destroyBtn:SetName("Tap again to confirm")
+				task.delay(3, function()
+					if W.Alive and os.clock() - confirmAt >= 3 then
+						destroyBtn:SetName("Destroy UI")
+					end
+				end)
+			end
 		end,
 	})
 	return tab
